@@ -1,40 +1,11 @@
 import { CreateConvertToBooleanFeedbackUpgradeScript } from '@companion-module/base'
 
-const actionsWithChannelAssignments = new Set([
-	'mute_input',
-	'mute_zone',
-	'input_to_zone',
-	'set_level_input',
-	'inc_dec_level_input',
-	'set_level_zone',
-	'inc_dec_level_zone',
-	'inc_dec_in_zn_send_level',
-	'set_in_zn_send_level',
-	'inc_dec_zn_zn_send_level',
-	'set_level_controlgroup',
-	'inc_dec_level_controlgroup',
-	'mute_controlgroup',
-	'preset_recall',
-	'playback_track',
-])
-
-function preserveActionAssignments(props) {
-	const changes = {
+function unchangedUpgradeResult() {
+	return {
 		updatedConfig: null,
 		updatedActions: [],
 		updatedFeedbacks: [],
 	}
-
-	for (const action of props.actions) {
-		if (!actionsWithChannelAssignments.has(action.actionId)) continue
-
-		changes.updatedActions.push({
-			...action,
-			options: { ...action.options },
-		})
-	}
-
-	return changes
 }
 
 export default [
@@ -115,9 +86,11 @@ export default [
 		return changes
 	},
 	function v3_buttons_preserve_action_assignments(context, props) {
-		return preserveActionAssignments(props)
+		// This slot previously rewrote unchanged actions. Keep the slot so upgrade
+		// indices remain stable, but leave wrapped literal/expression values untouched.
+		return unchangedUpgradeResult()
 	},
 	function v3_buttons_5_preserve_action_assignments(context, props) {
-		return preserveActionAssignments(props)
+		return unchangedUpgradeResult()
 	},
 ]

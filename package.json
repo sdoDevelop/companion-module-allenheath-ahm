@@ -1,6 +1,6 @@
 {
 	"name": "allenheath-ahm",
-	"version": "3.0.0-buttons.5",
+	"version": "3.0.0-buttons.6",
 	"description": "Allen & Heath AHM module for Companion",
 	"main": "index.js",
 	"type": "module",

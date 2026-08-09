@@ -20,27 +20,27 @@ test('legacy level option names migrate in the correct direction', () => {
 	assert.equal(changes.updatedActions[1].options.number, undefined)
 })
 
-test('Buttons upgrades preserve literal and expression action assignments', () => {
+test('unchanged Buttons actions are not rewritten during upgrades', () => {
+	const inputExpression = { isExpression: true, value: '$(position.state.mic_input)' }
+	const zoneExpression = { isExpression: true, value: '$(position.state.zone_output)' }
 	const props = {
 		config: { ahm_type: 'ahm16' },
 		actions: [
 			{
 				actionId: 'input_to_zone',
 				options: {
-					mute_number: '$(position.state.mic_input)',
-					number: '$(position.state.zone_output)',
-					operation: 'toggle',
+					mute_number: inputExpression,
+					number: zoneExpression,
+					operation: { isExpression: false, value: 'toggle' },
 				},
 			},
-			{ actionId: 'mute_input', options: { mute_number: 9, operation: 'toggle' } },
 		],
 		feedbacks: [],
 	}
 
 	const changes = UpgradeScripts.at(-1)({}, props)
 
-	assert.deepEqual(changes.updatedActions[0].options, props.actions[0].options)
-	assert.deepEqual(changes.updatedActions[1].options, props.actions[1].options)
-	assert.notEqual(changes.updatedActions[0], props.actions[0])
-	assert.notEqual(changes.updatedActions[0].options, props.actions[0].options)
+	assert.deepEqual(changes.updatedActions, [])
+	assert.equal(props.actions[0].options.mute_number, inputExpression)
+	assert.equal(props.actions[0].options.number, zoneExpression)
 })
