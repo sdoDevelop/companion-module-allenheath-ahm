@@ -28,6 +28,8 @@ class AHMInstance extends InstanceBase {
 		this.inputsToZonesMute = []
 		this.zonesMute = this.createArray(this.numberOfZones)
 		this.controlgroupsMute = this.createArray(this.numberOfControlGroups)
+		this.channelMuteWaiters = new Map()
+		this.sendMuteWaiters = new Map()
 		// list of monitored feedbacks
 		this.monitoredFeedbacks = []
 
@@ -142,6 +144,52 @@ class AHMInstance extends InstanceBase {
 
 	sleep(ms) {
 		return new Promise((resolve) => setTimeout(resolve, ms))
+	}
+
+	createMuteWaiter(waiters, key, timeoutMs) {
+		return new Promise((resolve, reject) => {
+			const waiter = { resolve, timeout: null }
+			waiter.timeout = setTimeout(() => {
+				const pending = waiters.get(key)
+				pending?.delete(waiter)
+				if (pending?.size === 0) waiters.delete(key)
+				reject(new Error('Timed out waiting for mute state'))
+			}, timeoutMs)
+
+			let pending = waiters.get(key)
+			if (!pending) {
+				pending = new Set()
+				waiters.set(key, pending)
+			}
+			pending.add(waiter)
+		})
+	}
+
+	resolveMuteWaiters(waiters, key, mute) {
+		const pending = waiters.get(key)
+		if (!pending) return
+
+		waiters.delete(key)
+		for (const waiter of pending) {
+			clearTimeout(waiter.timeout)
+			waiter.resolve(mute)
+		}
+	}
+
+	waitForChannelMute(type, channelNumber, timeoutMs) {
+		return this.createMuteWaiter(this.channelMuteWaiters, `${type}:${channelNumber}`, timeoutMs)
+	}
+
+	resolveChannelMute(type, channelNumber, mute) {
+		this.resolveMuteWaiters(this.channelMuteWaiters, `${type}:${channelNumber}`, mute)
+	}
+
+	waitForSendMute(inputNumber, zoneNumber, timeoutMs) {
+		return this.createMuteWaiter(this.sendMuteWaiters, `${inputNumber}:${zoneNumber}`, timeoutMs)
+	}
+
+	resolveSendMute(inputNumber, zoneNumber, mute) {
+		this.resolveMuteWaiters(this.sendMuteWaiters, `${inputNumber}:${zoneNumber}`, mute)
 	}
 
 	async updateLevelVariables() {
@@ -352,7 +400,7 @@ class AHMInstance extends InstanceBase {
 	processIncomingData(data) {
 		console.log(data)
 
-		if (data[0] === 0xF0) {
+		if (data[0] === 0xf0) {
 			// receiving SysEx data
 			if (data[9] === 0x03) {
 				// receiving send mute data
@@ -382,7 +430,7 @@ class AHMInstance extends InstanceBase {
 
 		if (data[1] === 0x63 && data[3] === 0x62) {
 			// second value of hex:63 and fourth value of hex:62 means level data
-			if (data[0] === 0xB0) {
+			if (data[0] === 0xb0) {
 				// first value of hex:b0 means channel level data
 
 				let inputLvlChangeNum = this.hexToDec(data[2]) + 1
@@ -398,7 +446,7 @@ class AHMInstance extends InstanceBase {
 
 				return
 			}
-			if (data[0] === 0xB1) {
+			if (data[0] === 0xb1) {
 				// first value of hex:b1 means zone level data
 
 				let zoneLvlChangeNum = this.hexToDec(data[2]) + 1
@@ -414,7 +462,7 @@ class AHMInstance extends InstanceBase {
 
 				return
 			}
-			if (data[0] === 0xB2) {
+			if (data[0] === 0xb2) {
 				// first value of hex:b2 means control group level data
 
 				let cgLvlChangeNum = this.hexToDec(data[2]) + 1
@@ -440,7 +488,10 @@ class AHMInstance extends InstanceBase {
 				// data[2] 63 == unmute, 127 == mute
 				//console.log(`Channel ${data[2] == 63 ? 'unmute' : 'mute'}: ${this.hexToDec(data[1]) + 1}`)
 				// this.log('debug', `Channel ${parseInt(data[1], 16) + 1} ${data[2] == 63 ? 'unmute' : 'mute'}`)
-				this.inputsMute[this.hexToDec(data[1])] = data[2] == 63 ? 0 : 1
+				const inputIndex = this.hexToDec(data[1])
+				const inputMute = data[2] != 63
+				this.inputsMute[inputIndex] = inputMute ? 1 : 0
+				this.resolveChannelMute(Constants.ChannelType.Input, inputIndex + 1, inputMute)
 				this.checkFeedbacks('inputMute')
 				return
 			}
@@ -449,7 +500,10 @@ class AHMInstance extends InstanceBase {
 
 				//console.log(`Zone ${data[2] == 63 ? 'unmute' : 'mute'}: ${this.hexToDec(data[1]) + 1}`)
 				//this.log('debug', `Zone ${this.hexToDec(data[1]) + 1} ${data[2] == 63 ? 'unmute' : 'mute'}`)
-				this.zonesMute[this.hexToDec(data[1])] = data[2] == 63 ? 0 : 1
+				const zoneIndex = this.hexToDec(data[1])
+				const zoneMute = data[2] != 63
+				this.zonesMute[zoneIndex] = zoneMute ? 1 : 0
+				this.resolveChannelMute(Constants.ChannelType.Zone, zoneIndex + 1, zoneMute)
 				this.checkFeedbacks('zoneMute')
 				return
 			}
@@ -457,13 +511,16 @@ class AHMInstance extends InstanceBase {
 				// first value of hex:92 means channel group mute
 
 				this.log('debug', `Control Group ${this.hexToDec(data[1]) + 1} ${data[2] == 63 ? 'unmute' : 'mute'}`)
-				this.controlgroupsMute[this.hexToDec(data[1])] = data[2] == 63 ? 0 : 1
+				const cgIndex = this.hexToDec(data[1])
+				const cgMute = data[2] != 63
+				this.controlgroupsMute[cgIndex] = cgMute ? 1 : 0
+				this.resolveChannelMute(Constants.ChannelType.ControlGroup, cgIndex + 1, cgMute)
 				this.checkFeedbacks('cgMute')
 				return
 			}
 		}
 
-		if (data[0] === 0xB0 && data[3] === 0xC0) {
+		if (data[0] === 0xb0 && data[3] === 0xc0) {
 			// first value of hex:B0 and third value of hex:C0 means preset recall data
 			return
 		}
@@ -500,6 +557,7 @@ class AHMInstance extends InstanceBase {
 					this.inputsToZonesMute[channelNumber][sendChannelNumber] = muteState
 				}
 
+				this.resolveSendMute(channelNumber, sendChannelNumber, muteState == 1)
 				break
 			default:
 				console.log(`updateSendMuteState: Storing Mute States is not implemented for Send Type ${sendType}`)

@@ -3,32 +3,50 @@ import * as Constants from './constants.js'
 
 const PRESET_COUNT = 500
 const PLAYBACK_COUNT = 127
+const MUTE_STATE_TIMEOUT_MS = 1000
+
+const MuteOperation = {
+	Set: 'set',
+	Toggle: 'toggle',
+}
 
 export function getActions() {
 	let actions = {}
 
-	this.listOptions = (name, qty, offset) => {
+	this.listOptions = (name, qty) => {
 		return [
 			{
-				type: 'dropdown',
+				type: 'number',
 				id: 'number',
 				label: name,
-				default: 0,
-				choices: Helpers.getChoicesArrayWithIncrementingNumbers(name, qty, offset),
-				minChoicesForSearch: 0,
+				default: 1,
+				min: 1,
+				max: qty,
+				asInteger: true,
 			},
 		]
 	}
 
-	this.muteOptions = (name, qty, offset) => {
+	this.muteOptions = (name, qty) => {
 		return [
 			{
-				type: 'dropdown',
+				type: 'number',
 				id: 'mute_number',
 				label: name,
-				default: 0,
-				choices: Helpers.getChoicesArrayWithIncrementingNumbers(name, qty, offset),
-				minChoicesForSearch: 0,
+				default: 1,
+				min: 1,
+				max: qty,
+				asInteger: true,
+			},
+			{
+				type: 'dropdown',
+				id: 'operation',
+				label: 'Operation',
+				default: MuteOperation.Set,
+				choices: [
+					{ id: MuteOperation.Set, label: 'Set mute state' },
+					{ id: MuteOperation.Toggle, label: 'Toggle current state' },
+				],
 			},
 			{
 				type: 'checkbox',
@@ -39,15 +57,16 @@ export function getActions() {
 		]
 	}
 
-	this.setLevelOptions = (name, qty, offset) => {
+	this.setLevelOptions = (name, qty) => {
 		return [
 			{
-				type: 'dropdown',
+				type: 'number',
 				id: 'setlvl_ch_number',
 				label: name,
-				default: 0,
-				choices: Helpers.getChoicesArrayWithIncrementingNumbers(name, qty, offset),
-				minChoicesForSearch: 0,
+				default: 1,
+				min: 1,
+				max: qty,
+				asInteger: true,
 			},
 			{
 				type: 'dropdown',
@@ -59,15 +78,16 @@ export function getActions() {
 		]
 	}
 
-	this.incDecOptions = (name, qty, offset) => {
+	this.incDecOptions = (name, qty) => {
 		return [
 			{
-				type: 'dropdown',
+				type: 'number',
 				id: 'incdec_ch_number',
 				label: name,
-				default: 0,
-				choices: Helpers.getChoicesArrayWithIncrementingNumbers(name, qty, offset),
-				minChoicesForSearch: 0,
+				default: 1,
+				min: 1,
+				max: qty,
+				asInteger: true,
 			},
 			{
 				type: 'dropdown',
@@ -105,17 +125,18 @@ export function getActions() {
 		let typeCodeSetLevel = parseInt(0xb0 + type) // type code for Command "Channel Level"
 		let typeCodeGetLevel = parseInt(0x00 + type) // type code for Command "Get Channel Level"
 		let chNumber = parseInt(action.options.setlvl_ch_number)
+		let chIndex = chNumber - 1
 		let levelDec = parseInt(action.options.level)
 
 		let buffers = [
-			Buffer.from([typeCodeSetLevel, 0x63, chNumber, typeCodeSetLevel, 0x62, 0x17, typeCodeSetLevel, 0x06, levelDec]),
+			Buffer.from([typeCodeSetLevel, 0x63, chIndex, typeCodeSetLevel, 0x62, 0x17, typeCodeSetLevel, 0x06, levelDec]),
 		]
 		this.sendCommand(buffers)
 
 		// wait until device has processed first command and then send "Get Channel Level" command so the response triggers the variable to be updated
 		await this.sleep(150)
 		buffers = [
-			Buffer.from([0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, typeCodeGetLevel, 0x01, 0x0b, 0x17, chNumber, 0xf7]),
+			Buffer.from([0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, typeCodeGetLevel, 0x01, 0x0b, 0x17, chIndex, 0xf7]),
 		]
 		this.sendCommand(buffers)
 	}
@@ -128,13 +149,14 @@ export function getActions() {
 		let typeCodeSetLevel = parseInt(0xb0 + type) // type code for Command "Level Increment / Decrement"
 		let typeCodeGetLevel = parseInt(0x00 + type) // type code for Command "Get Channel Level"
 		let chNumber = parseInt(action.options.incdec_ch_number)
+		let chIndex = chNumber - 1
 		let incdecSelector = action.options.incdec == 'inc' ? 0x7f : 0x3f
 
 		let buffers = [
 			Buffer.from([
 				typeCodeSetLevel,
 				0x63,
-				chNumber,
+				chIndex,
 				typeCodeSetLevel,
 				0x62,
 				0x20,
@@ -148,7 +170,7 @@ export function getActions() {
 		// wait until device has processed first command and then send "Get Channel Level" command so the response triggers the variable to be updated
 		await this.sleep(150)
 		buffers = [
-			Buffer.from([0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, typeCodeGetLevel, 0x01, 0x0b, 0x17, chNumber, 0xf7]),
+			Buffer.from([0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, typeCodeGetLevel, 0x01, 0x0b, 0x17, chIndex, 0xf7]),
 		]
 		this.sendCommand(buffers)
 	}
@@ -176,9 +198,9 @@ export function getActions() {
 				0x00,
 				chType,
 				0x04,
-				chNumber,
+				chNumber - 1,
 				sendChType,
-				sendChNumber,
+				sendChNumber - 1,
 				incdecSelector,
 				0xf7,
 			]),
@@ -187,79 +209,87 @@ export function getActions() {
 		this.sendCommand(buffers)
 	}
 
+	this.resolveMute = async (action, requestCurrentMute, target) => {
+		if (action.options.operation !== MuteOperation.Toggle) {
+			return action.options.mute
+		}
+
+		try {
+			return !(await requestCurrentMute())
+		} catch (error) {
+			this.log('error', `Could not toggle ${target}: ${error.message ?? error}`)
+			return undefined
+		}
+	}
+
+	this.requestCurrentChannelMute = (type, channelNumber) => {
+		const pendingMute = this.waitForChannelMute(type, channelNumber, MUTE_STATE_TIMEOUT_MS)
+		this.requestMuteInfo(type, channelNumber)
+		return pendingMute
+	}
+	this.requestCurrentSendMute = (inputNumber, zoneNumber) => {
+		const pendingMute = this.waitForSendMute(inputNumber, zoneNumber, MUTE_STATE_TIMEOUT_MS)
+		this.requestSendMuteInfo(Constants.SendType.InputToZone, inputNumber, zoneNumber)
+		return pendingMute
+	}
+
 	actions['mute_input'] = {
 		name: 'Mute Input',
-		options: this.muteOptions('Input', this.numberOfInputs, -1),
-		callback: (action) => {
-			let inputNumber = parseInt(action.options.mute_number)
+		options: this.muteOptions('Input', this.numberOfInputs),
+		callback: async (action) => {
+			const inputNumber = parseInt(action.options.mute_number)
+			const inputIndex = inputNumber - 1
+			const mute = await this.resolveMute(
+				action,
+				() => this.requestCurrentChannelMute(Constants.ChannelType.Input, inputNumber),
+				`input ${inputNumber}`,
+			)
+			if (mute === undefined) return
 
-			let buffers = [Buffer.from([0x90, inputNumber, action.options.mute ? 0x7f : 0x3f, 0x90, inputNumber, 0])]
-
-			this.sendCommand(buffers)
-			this.inputsMute[inputNumber] = action.options.mute ? 1 : 0
+			this.sendCommand([Buffer.from([0x90, inputIndex, mute ? 0x7f : 0x3f, 0x90, inputIndex, 0])])
+			this.inputsMute[inputIndex] = mute ? 1 : 0
 			this.checkFeedbacks('inputMute')
 		},
 	}
 
 	actions['mute_zone'] = {
 		name: 'Mute Zone',
-		options: this.muteOptions('Zone', this.numberOfInputs, -1),
-		callback: (action) => {
-			let zoneNumber = parseInt(action.options.mute_number)
+		options: this.muteOptions('Zone', this.numberOfZones),
+		callback: async (action) => {
+			const zoneNumber = parseInt(action.options.mute_number)
+			const zoneIndex = zoneNumber - 1
+			const mute = await this.resolveMute(
+				action,
+				() => this.requestCurrentChannelMute(Constants.ChannelType.Zone, zoneNumber),
+				`zone ${zoneNumber}`,
+			)
+			if (mute === undefined) return
 
-			let buffers = [Buffer.from([0x91, zoneNumber, action.options.mute ? 0x7f : 0x3f, 0x91, zoneNumber, 0])]
-
-			this.sendCommand(buffers)
-			this.zonesMute[zoneNumber] = action.options.mute ? 1 : 0
+			this.sendCommand([Buffer.from([0x91, zoneIndex, mute ? 0x7f : 0x3f, 0x91, zoneIndex, 0])])
+			this.zonesMute[zoneIndex] = mute ? 1 : 0
 			this.checkFeedbacks('zoneMute')
 		},
 	}
 
 	actions['preset_recall'] = {
 		name: 'Recall Preset',
-		options: this.listOptions('Preset', PRESET_COUNT, -1),
+		options: this.listOptions('Preset', PRESET_COUNT),
 		callback: (action) => {
-			let presetNumber = parseInt(action.options.number)
-			let buffers = [
-				Buffer.from([
-					0xb0,
-					0x00,
-					presetNumber < 128 ? 0x00 : presetNumber < 256 ? 0x01 : presetNumber < 384 ? 0x02 : 0x03,
-					0xc0,
-					presetNumber,
-				]),
-			]
+			const presetNumber = parseInt(action.options.number)
+			const presetIndex = presetNumber - 1
+			const buffers = [Buffer.from([0xb0, 0x00, Math.floor(presetIndex / 128), 0xc0, presetIndex % 128])]
 			this.sendCommand(buffers)
 		},
 	}
 
 	actions['playback_track'] = {
 		name: 'Playback Track',
-		options: this.listOptions('Playback Track', PLAYBACK_COUNT, -1).concat(
-			this.playbackChannelOptions('Playback Channel'),
-		),
+		options: this.listOptions('Playback Track', PLAYBACK_COUNT).concat(this.playbackChannelOptions('Playback Channel')),
 		callback: (action) => {
 			let trackNumber = parseInt(action.options.number)
 			let playbackChannel = parseInt(action.options.playbackChannel)
 
 			// console.log(`action playback_track: Got Callback with parameters trackNumber: ${action.options.number} and playbackChannel ${action.options.playbackChannel}.`)
-
-			let buffers = [
-				Buffer.from([0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, 0x00, 0x06, playbackChannel, trackNumber, 0xf7]),
-			]
-
-			this.sendCommand(buffers)
-		},
-	}
-
-	actions['input_to_zone'] = {
-		name: 'Mute Input to Zone',
-		options: this.muteOptions('Input', this.numberOfInputs, -1).concat(
-			this.listOptions('Zone', this.numberOfZones, -1),
-		),
-		callback: (action) => {
-			let inputNumber = parseInt(action.options.mute_number)
-			let zoneNumber = parseInt(action.options.number)
 
 			let buffers = [
 				Buffer.from([
@@ -272,31 +302,58 @@ export function getActions() {
 					0x01,
 					0x00,
 					0x00,
-					0x03,
-					inputNumber,
-					0x01,
-					zoneNumber,
-					action.options.mute ? 0x7f : 0x3f,
+					0x06,
+					playbackChannel,
+					trackNumber - 1,
 					0xf7,
 				]),
 			]
+
 			this.sendCommand(buffers)
+		},
+	}
 
-			// manually update internal state, (internal state works with user-number, hence + 1)
-			this.updateSendMuteState(
-				Constants.SendType.InputToZone,
-				inputNumber + 1,
-				zoneNumber + 1,
-				action.options.mute ? 1 : 0,
+	actions['input_to_zone'] = {
+		name: 'Mute Input to Zone',
+		options: this.muteOptions('Input', this.numberOfInputs).concat(this.listOptions('Zone', this.numberOfZones)),
+		callback: async (action) => {
+			const inputNumber = parseInt(action.options.mute_number)
+			const zoneNumber = parseInt(action.options.number)
+			const mute = await this.resolveMute(
+				action,
+				() => this.requestCurrentSendMute(inputNumber, zoneNumber),
+				`input ${inputNumber} to zone ${zoneNumber}`,
 			)
+			if (mute === undefined) return
 
+			this.sendCommand([
+				Buffer.from([
+					0xf0,
+					0x00,
+					0x00,
+					0x1a,
+					0x50,
+					0x12,
+					0x01,
+					0x00,
+					0x00,
+					0x03,
+					inputNumber - 1,
+					0x01,
+					zoneNumber - 1,
+					mute ? 0x7f : 0x3f,
+					0xf7,
+				]),
+			])
+
+			this.updateSendMuteState(Constants.SendType.InputToZone, inputNumber, zoneNumber, mute ? 1 : 0)
 			this.checkFeedbacks('inputToZoneMute')
 		},
 	}
 
 	actions['set_level_input'] = {
 		name: 'Set Level of Input',
-		options: this.setLevelOptions('Input', this.numberOfInputs, -1),
+		options: this.setLevelOptions('Input', this.numberOfInputs),
 		callback: async (action) => {
 			this.setLevelCallback(action, Constants.ChannelType.Input)
 		},
@@ -304,7 +361,7 @@ export function getActions() {
 
 	actions['inc_dec_level_input'] = {
 		name: 'Increment/Decrement Level of Input',
-		options: this.incDecOptions('Input', this.numberOfInputs, -1),
+		options: this.incDecOptions('Input', this.numberOfInputs),
 		callback: async (action) => {
 			this.incDecLevelCallback(action, Constants.ChannelType.Input)
 		},
@@ -312,7 +369,7 @@ export function getActions() {
 
 	actions['set_level_zone'] = {
 		name: 'Set Level of Zone',
-		options: this.setLevelOptions('Zone', this.numberOfZones, -1),
+		options: this.setLevelOptions('Zone', this.numberOfZones),
 		callback: async (action) => {
 			this.setLevelCallback(action, Constants.ChannelType.Zone)
 		},
@@ -320,7 +377,7 @@ export function getActions() {
 
 	actions['inc_dec_level_zone'] = {
 		name: 'Increment/Decrement Level of Zone',
-		options: this.incDecOptions('Zone', this.numberOfZones, -1),
+		options: this.incDecOptions('Zone', this.numberOfZones),
 		callback: async (action) => {
 			this.incDecLevelCallback(action, Constants.ChannelType.Zone)
 		},
@@ -328,9 +385,7 @@ export function getActions() {
 
 	actions['inc_dec_in_zn_send_level'] = {
 		name: 'Increment/Decrement Input to Zone Send Level',
-		options: this.incDecOptions('Input', this.numberOfInputs, -1).concat(
-			this.listOptions('Zone', this.numberOfZones, -1),
-		),
+		options: this.incDecOptions('Input', this.numberOfInputs).concat(this.listOptions('Zone', this.numberOfZones)),
 		callback: async (action) => {
 			this.incDecSendLevelCallback(action, Constants.SendType.InputToZone)
 		},
@@ -338,9 +393,7 @@ export function getActions() {
 
 	actions['inc_dec_zn_zn_send_level'] = {
 		name: 'Increment/Decrement Zone to Zone Send Level',
-		options: this.incDecOptions('Zone', this.numberOfZones, -1).concat(
-			this.listOptions('Zone', this.numberOfZones, -1),
-		),
+		options: this.incDecOptions('Zone', this.numberOfZones).concat(this.listOptions('Zone', this.numberOfZones)),
 		callback: async (action) => {
 			this.incDecSendLevelCallback(action, Constants.SendType.ZoneToZone)
 		},
@@ -349,7 +402,7 @@ export function getActions() {
 	// Control Group actions
 	actions['set_level_controlgroup'] = {
 		name: 'Set Level of Control Group',
-		options: this.setLevelOptions('Control Group', this.numberOfControlGroups, -1),
+		options: this.setLevelOptions('Control Group', this.numberOfControlGroups),
 		callback: async (action) => {
 			this.setLevelCallback(action, Constants.ChannelType.ControlGroup)
 		},
@@ -357,7 +410,7 @@ export function getActions() {
 
 	actions['inc_dec_level_controlgroup'] = {
 		name: 'Increment/Decrement Level of Control Group',
-		options: this.incDecOptions('Control Group', this.numberOfControlGroups, -1),
+		options: this.incDecOptions('Control Group', this.numberOfControlGroups),
 		callback: async (action) => {
 			this.incDecLevelCallback(action, Constants.ChannelType.ControlGroup)
 		},
@@ -365,21 +418,26 @@ export function getActions() {
 
 	actions['mute_controlgroup'] = {
 		name: 'Mute Control Group',
-		options: this.muteOptions('Control Group', this.numberOfControlGroups, -1),
-		callback: (action) => {
-			let cgNumber = parseInt(action.options.mute_number)
+		options: this.muteOptions('Control Group', this.numberOfControlGroups),
+		callback: async (action) => {
+			const cgNumber = parseInt(action.options.mute_number)
+			const cgIndex = cgNumber - 1
+			const mute = await this.resolveMute(
+				action,
+				() => this.requestCurrentChannelMute(Constants.ChannelType.ControlGroup, cgNumber),
+				`control group ${cgNumber}`,
+			)
+			if (mute === undefined) return
 
-			let buffers = [Buffer.from([0x92, cgNumber, action.options.mute ? 0x7f : 0x3f, 0x92, cgNumber, 0])]
-
-			this.sendCommand(buffers)
-			this.controlgroupsMute[cgNumber] = action.options.mute ? 1 : 0
+			this.sendCommand([Buffer.from([0x92, cgIndex, mute ? 0x7f : 0x3f, 0x92, cgIndex, 0])])
+			this.controlgroupsMute[cgIndex] = mute ? 1 : 0
 			this.checkFeedbacks('cgMute')
 		},
 	}
 
 	// actions['get_phantom'] = {
 	// 	name: 'Get phantom info',
-	// 	options: this.listOptions('Input', 64, -1),
+	// 	options: this.listOptions('Input', 64),
 	//callback: (action) => {}
 	// }
 
