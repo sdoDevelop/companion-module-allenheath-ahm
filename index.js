@@ -528,11 +528,16 @@ class AHMInstance extends InstanceBase {
 	/** Stores Input-to-Zone send levels using 1-based user channel numbers. */
 	updateSendLevelState(sendType, channelNumber, sendChannelNumber, levelRaw) {
 		if (sendType !== Constants.SendType.InputToZone) return
+		const normalizedLevel = Helpers.normalizeAhmLevel(levelRaw)
+		if (normalizedLevel === undefined) return
 
 		if (!Array.isArray(this.inputsToZonesLevel[channelNumber])) {
 			this.inputsToZonesLevel[channelNumber] = new Array(this.numberOfZones + 1).fill(undefined)
 		}
 		this.inputsToZonesLevel[channelNumber][sendChannelNumber] = levelRaw
+
+		const gaugeVariable = Helpers.getVarNameInputToZoneGauge(channelNumber, sendChannelNumber)
+		this.setVariableValues({ [gaugeVariable]: normalizedLevel })
 	}
 
 	getInputToZoneLevel(channelNumber, sendChannelNumber) {

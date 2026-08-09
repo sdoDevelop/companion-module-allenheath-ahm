@@ -10,7 +10,8 @@ This build keeps the AHM 3.0.0 user-facing numbering while using the older modul
 - Action number fields support expressions, so a position variable containing `1` targets Input 1 or Zone 1 directly.
 - Input, zone, control group, and input-to-zone mute actions offer **Set mute state** and **Toggle current state** operations.
 - Toggle mode requests the current mute state from the AHM before sending the opposite state. It does not require workflow variables.
-- The **Input to Zone - Level Display** feedback shows the current send level in dB and only tracks the pairs used on buttons.
+- The **Input to Zone - Level Display** feedback shows the current send level in dB and only requests the pairs used on buttons.
+- Each Input-to-Zone pair also exposes a normalized `ip_<input>_zn_<zone>_gauge` connection variable for the Buttons **Gauge 1 Value** field. The value ranges from `0` to `1`.
 
 ### Existing 2.3.1 actions
 

@@ -2,7 +2,7 @@ import * as Helpers from './helpers.js'
 
 export function getVariables() {
 	const variableDefinitions = []
-	const variableInitValuesArray = []
+	const variableInitValues = {}
 
 	// generate input level variables
 	let unitInAmount = this.numberOfInputs
@@ -13,9 +13,7 @@ export function getVariables() {
 			variableId: varId,
 		})
 		// initialize with ?
-		variableInitValuesArray.push({
-			[varId]: '?',
-		})
+		variableInitValues[varId] = '?'
 	}
 
 	// generate zone level variables
@@ -27,9 +25,7 @@ export function getVariables() {
 			variableId: varId,
 		})
 		// initialize with ?
-		variableInitValuesArray.push({
-			[varId]: '?',
-		})
+		variableInitValues[varId] = '?'
 	}
 
 	// generate control group level variables
@@ -41,15 +37,21 @@ export function getVariables() {
 			variableId: varId,
 		})
 		// initialize with ?
-		variableInitValuesArray.push({
-			[varId]: '?',
-		})
+		variableInitValues[varId] = '?'
 	}
 
-	// flatten init Value Array (convert into single object instead of array)
-	const variableInitValues = variableInitValuesArray.reduce((acc, obj) => {
-		return { ...acc, ...obj }
-	}, {})
+	// Generate normalized Input-to-Zone gauge variables. Only pairs monitored by
+	// feedbacks are requested from AHM and updated while Buttons is running.
+	for (let input = 1; input <= this.numberOfInputs; input++) {
+		for (let zone = 1; zone <= this.numberOfZones; zone++) {
+			const varId = Helpers.getVarNameInputToZoneGauge(input, zone)
+			variableDefinitions.push({
+				name: `Input ${input} to Zone ${zone} Gauge`,
+				variableId: varId,
+			})
+			variableInitValues[varId] = 0
+		}
+	}
 
 	return [variableDefinitions, variableInitValues]
 }

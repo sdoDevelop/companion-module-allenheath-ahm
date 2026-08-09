@@ -81,6 +81,22 @@ export function getVarNameCGLevel(cgNum) {
 }
 
 /**
+ * Returns the variable name for a normalized Input-to-Zone send level.
+ * The value is in the 0-1 range expected by a Buttons gauge.
+ * @param inputNum Integer number of the Input channel
+ * @param zoneNum Integer number of the Zone channel
+ */
+export function getVarNameInputToZoneGauge(inputNum, zoneNum) {
+	return `ip_${inputNum}_zn_${zoneNum}_gauge`
+}
+
+/** Convert an AHM fader position (0-127) to the 0-1 range used by Buttons gauges. */
+export function normalizeAhmLevel(levelRaw) {
+	if (!Number.isInteger(levelRaw) || levelRaw < 0 || levelRaw > 127) return undefined
+	return levelRaw / 127
+}
+
+/**
  * Checks if the value given is a value of the enum enumType. Logs an error if this is not the case.
  * @param value value to check if it is part of enum enumType
  * @param enumType enum to check wether value is value of
