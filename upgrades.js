@@ -1,5 +1,42 @@
 import { CreateConvertToBooleanFeedbackUpgradeScript } from '@companion-module/base'
 
+const actionsWithChannelAssignments = new Set([
+	'mute_input',
+	'mute_zone',
+	'input_to_zone',
+	'set_level_input',
+	'inc_dec_level_input',
+	'set_level_zone',
+	'inc_dec_level_zone',
+	'inc_dec_in_zn_send_level',
+	'set_in_zn_send_level',
+	'inc_dec_zn_zn_send_level',
+	'set_level_controlgroup',
+	'inc_dec_level_controlgroup',
+	'mute_controlgroup',
+	'preset_recall',
+	'playback_track',
+])
+
+function preserveActionAssignments(props) {
+	const changes = {
+		updatedConfig: null,
+		updatedActions: [],
+		updatedFeedbacks: [],
+	}
+
+	for (const action of props.actions) {
+		if (!actionsWithChannelAssignments.has(action.actionId)) continue
+
+		changes.updatedActions.push({
+			...action,
+			options: { ...action.options },
+		})
+	}
+
+	return changes
+}
+
 export default [
 	CreateConvertToBooleanFeedbackUpgradeScript({
 		inputMute: true,
@@ -78,40 +115,9 @@ export default [
 		return changes
 	},
 	function v3_buttons_preserve_action_assignments(context, props) {
-		const changes = {
-			updatedConfig: null,
-			updatedActions: [],
-			updatedFeedbacks: [],
-		}
-
-		const actionsWithChannelAssignments = new Set([
-			'mute_input',
-			'mute_zone',
-			'input_to_zone',
-			'set_level_input',
-			'inc_dec_level_input',
-			'set_level_zone',
-			'inc_dec_level_zone',
-			'inc_dec_in_zn_send_level',
-			'inc_dec_zn_zn_send_level',
-			'set_level_controlgroup',
-			'inc_dec_level_controlgroup',
-			'mute_controlgroup',
-			'preset_recall',
-			'playback_track',
-		])
-
-		for (const action of props.actions) {
-			if (!actionsWithChannelAssignments.has(action.actionId)) continue
-
-			// Return a fresh action/options object so Buttons explicitly carries every
-			// stored number or expression into the new module version unchanged.
-			changes.updatedActions.push({
-				...action,
-				options: { ...action.options },
-			})
-		}
-
-		return changes
+		return preserveActionAssignments(props)
+	},
+	function v3_buttons_5_preserve_action_assignments(context, props) {
+		return preserveActionAssignments(props)
 	},
 ]

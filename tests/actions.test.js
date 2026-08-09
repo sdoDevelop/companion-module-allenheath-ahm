@@ -6,6 +6,7 @@ import * as Constants from '../constants.js'
 function createContext({ channelMute = false, sendMute = false } = {}) {
 	const sent = []
 	const sendState = []
+	const levelRequests = []
 	const context = {
 		numberOfInputs: 16,
 		numberOfZones: 16,
@@ -23,10 +24,10 @@ function createContext({ channelMute = false, sendMute = false } = {}) {
 		waitForSendMute: async () => sendMute,
 		requestSendMuteInfo: () => {},
 		updateSendMuteState: (...args) => sendState.push(args),
-		requestSendLevelInfo: () => {},
+		requestSendLevelInfo: (...args) => levelRequests.push(args),
 	}
 
-	return { context, actions: getActions.bind(context)(), sent, sendState }
+	return { context, actions: getActions.bind(context)(), sent, sendState, levelRequests }
 }
 
 test('action number fields are 1-based number inputs', () => {
@@ -98,6 +99,29 @@ test('Input 1 level actions use AHM channel byte 0', async () => {
 
 	assert.equal(sent[0][2], 0)
 	assert.equal(sent[1][12], 0)
+})
+
+test('absolute Input-to-Zone level uses 1-based options, the documented SysEx command, and refreshes state', async () => {
+	const { actions, sent, levelRequests } = createContext()
+	const inputOption = actions.set_in_zn_send_level.options.find((option) => option.id === 'input')
+	const zoneOption = actions.set_in_zn_send_level.options.find((option) => option.id === 'zone')
+
+	assert.deepEqual(
+		{ type: inputOption.type, default: inputOption.default, min: inputOption.min, max: inputOption.max },
+		{ type: 'number', default: 1, min: 1, max: 16 },
+	)
+	assert.deepEqual(
+		{ type: zoneOption.type, default: zoneOption.default, min: zoneOption.min, max: zoneOption.max },
+		{ type: 'number', default: 1, min: 1, max: 16 },
+	)
+
+	await actions.set_in_zn_send_level.callback({ options: { input: 1, zone: 16, level: 105 } })
+
+	assert.deepEqual(
+		[...sent[0]],
+		[0xf0, 0x00, 0x00, 0x1a, 0x50, 0x12, 0x01, 0x00, 0x00, 0x02, 0x00, 0x01, 0x0f, 0x69, 0xf7],
+	)
+	assert.deepEqual(levelRequests, [[Constants.SendType.InputToZone, 1, 16]])
 })
 
 test('presets and playback tracks are also 1-based', async () => {

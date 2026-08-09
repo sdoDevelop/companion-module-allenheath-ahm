@@ -13,6 +13,7 @@ This build keeps the AHM 3.0.0 user-facing numbering while using the older modul
 - The **Input to Zone - Level Display** feedback shows the current send level in dB and only requests the pairs used on buttons.
 - Each Input-to-Zone pair also exposes a normalized `ip_<input>_zn_<zone>_gauge` connection variable for the Buttons **Gauge 1 Value** field. The value ranges from `0` to `1`.
 - Module upgrades explicitly preserve existing input, zone, control-group, preset, and playback action assignments.
+- **Set Input to Zone Send Level** sets an absolute crosspoint level from `-inf` through `+10 dB`, then refreshes the level display and gauge.
 
 ### Existing 2.3.1 actions
 

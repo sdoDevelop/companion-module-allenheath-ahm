@@ -78,6 +78,36 @@ export function getActions() {
 		]
 	}
 
+	this.setSendLevelOptions = () => {
+		return [
+			{
+				type: 'number',
+				id: 'input',
+				label: 'Input',
+				default: 1,
+				min: 1,
+				max: this.numberOfInputs,
+				asInteger: true,
+			},
+			{
+				type: 'number',
+				id: 'zone',
+				label: 'Zone',
+				default: 1,
+				min: 1,
+				max: this.numberOfZones,
+				asInteger: true,
+			},
+			{
+				type: 'dropdown',
+				id: 'level',
+				label: 'Set Level (dB)',
+				default: 105,
+				choices: Helpers.getChoicesArrayOf1DArray(Constants.dbu_Values),
+			},
+		]
+	}
+
 	this.incDecOptions = (name, qty) => {
 		return [
 			{
@@ -211,6 +241,41 @@ export function getActions() {
 		if (type === Constants.SendType.InputToZone) {
 			await this.sleep(150)
 			this.requestSendLevelInfo(type, chNumber, sendChNumber)
+		}
+	}
+
+	this.setSendLevelCallback = async (action, type) => {
+		if (Helpers.checkIfValueOfEnum(type, Constants.SendType) == false) return
+
+		const chType = Helpers.getChTypeOfSendType(type)
+		const sendChType = Helpers.getSendChTypeOfSendType(type)
+		const inputNumber = parseInt(action.options.input)
+		const zoneNumber = parseInt(action.options.zone)
+		const level = parseInt(action.options.level)
+
+		this.sendCommand([
+			Buffer.from([
+				0xf0,
+				0x00,
+				0x00,
+				0x1a,
+				0x50,
+				0x12,
+				0x01,
+				0x00,
+				chType,
+				0x02,
+				inputNumber - 1,
+				sendChType,
+				zoneNumber - 1,
+				level,
+				0xf7,
+			]),
+		])
+
+		if (type === Constants.SendType.InputToZone) {
+			await this.sleep(150)
+			this.requestSendLevelInfo(type, inputNumber, zoneNumber)
 		}
 	}
 
@@ -393,6 +458,14 @@ export function getActions() {
 		options: this.incDecOptions('Input', this.numberOfInputs).concat(this.listOptions('Zone', this.numberOfZones)),
 		callback: async (action) => {
 			this.incDecSendLevelCallback(action, Constants.SendType.InputToZone)
+		},
+	}
+
+	actions['set_in_zn_send_level'] = {
+		name: 'Set Input to Zone Send Level',
+		options: this.setSendLevelOptions(),
+		callback: async (action) => {
+			await this.setSendLevelCallback(action, Constants.SendType.InputToZone)
 		},
 	}
 
