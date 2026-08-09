@@ -143,10 +143,16 @@ export const SendType = {
 	ZoneToZone: 0x11, // 0b 00010001
 }
 
+export const SendInfoType = {
+	Level: 0x02,
+	Mute: 0x03,
+}
+
 // Types of feedbacks to monitor (e.g. poll or update on connect)
 export const MonitoredFeedbackType = {
 	Undefined: 0,
 	MuteState: 1,
+	Level: 2,
 }
 
 // Playback Channel for "Audio Playback" Command

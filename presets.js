@@ -26,7 +26,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_input',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: true,
 							},
 						},
@@ -38,7 +38,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_input',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: false,
 							},
 						},
@@ -80,7 +80,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_zone',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: true,
 							},
 						},
@@ -92,7 +92,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_zone',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: false,
 							},
 						},
@@ -134,7 +134,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_controlgroup',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: true,
 							},
 						},
@@ -146,7 +146,7 @@ export function getPresets() {
 						{
 							actionId: 'mute_controlgroup',
 							options: {
-								mute_number: index,
+								mute_number: index + 1,
 								mute: false,
 							},
 						},

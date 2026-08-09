@@ -26,6 +26,7 @@ class AHMInstance extends InstanceBase {
 		this.numberOfControlGroups = 32
 		this.inputsMute = this.createArray(this.numberOfInputs)
 		this.inputsToZonesMute = []
+		this.inputsToZonesLevel = []
 		this.zonesMute = this.createArray(this.numberOfZones)
 		this.controlgroupsMute = this.createArray(this.numberOfControlGroups)
 		this.channelMuteWaiters = new Map()
@@ -133,6 +134,9 @@ class AHMInstance extends InstanceBase {
 		switch (feedback.type) {
 			case Constants.MonitoredFeedbackType.MuteState:
 				this.requestSendMuteInfo(feedback.sendType, feedback.channel, feedback.sendChannel)
+				break
+			case Constants.MonitoredFeedbackType.Level:
+				this.requestSendLevelInfo(feedback.sendType, feedback.channel, feedback.sendChannel)
 				break
 			case Constants.MonitoredFeedbackType.Undefined:
 				// do nothing
@@ -255,19 +259,19 @@ class AHMInstance extends InstanceBase {
 	}
 
 	requestSendMuteInfo(sendType, chNumber, sendChNumber) {
-		if (Helpers.checkIfValueOfEnum(sendType, Constants.SendType) == false) {
-			return
-		}
+		this.requestSendInfo(sendType, Constants.SendInfoType.Mute, chNumber, sendChNumber)
+	}
 
-		// get types of send
-		let chType = Helpers.getChTypeOfSendType(sendType)
-		let sendChType = Helpers.getSendChTypeOfSendType(sendType)
+	requestSendLevelInfo(sendType, chNumber, sendChNumber) {
+		this.requestSendInfo(sendType, Constants.SendInfoType.Level, chNumber, sendChNumber)
+	}
 
-		console.log(
-			`requestSendMuteInfo: chType: ${chType}, ch: ${chNumber}, sendChType: ${sendChType}, sendChNumber: ${sendChNumber}`,
-		)
+	requestSendInfo(sendType, infoType, chNumber, sendChNumber) {
+		if (Helpers.checkIfValueOfEnum(sendType, Constants.SendType) == false) return
 
-		let buffer = [
+		const chType = Helpers.getChTypeOfSendType(sendType)
+		const sendChType = Helpers.getSendChTypeOfSendType(sendType)
+		const buffer = [
 			Buffer.from([
 				0xf0,
 				0x00,
@@ -280,7 +284,7 @@ class AHMInstance extends InstanceBase {
 				parseInt(chType),
 				0x01,
 				0x0f,
-				0x03,
+				parseInt(infoType),
 				parseInt(chNumber) - 1,
 				parseInt(sendChType),
 				parseInt(sendChNumber) - 1,
@@ -401,30 +405,25 @@ class AHMInstance extends InstanceBase {
 		console.log(data)
 
 		if (data[0] === 0xf0) {
-			// receiving SysEx data
-			if (data[9] === 0x03) {
-				// receiving send mute data
+			const inputNum = this.hexToDec(data[10]) + 1
+			const zoneNum = this.hexToDec(data[12]) + 1
+			const isInputToZone = data[8] === Constants.ChannelType.Input && data[11] === Constants.ChannelType.Zone
+			if (!isInputToZone) return
 
-				/* console.log(
-					`Input ${this.hexToDec(data[10]) + 1} to zone Zone ${this.hexToDec(data[12]) + 1} ${
-						data[13] == 63 ? 'unmute' : 'mute'
-					}`
-				)
-				this.log(
-					'debug',
-					`Input ${this.hexToDec(data[10]) + 1} to zone Zone ${this.hexToDec(data[12]) + 1} ${
-						data[13] == 63 ? 'unmute' : 'mute'
-					}`
-				)*/
+			if (data[9] === Constants.SendInfoType.Level) {
+				const levelRaw = this.hexToDec(data[13])
+				this.updateSendLevelState(Constants.SendType.InputToZone, inputNum, zoneNum, levelRaw)
+				this.checkFeedbacks('inputToZoneLevel')
+				return
+			}
 
-				let inputNum = this.hexToDec(data[10]) + 1
-				let zoneNum = this.hexToDec(data[12]) + 1
-				let muteState = data[13] == 63 ? 0 : 1
-
+			if (data[9] === Constants.SendInfoType.Mute) {
+				const muteState = data[13] == 63 ? 0 : 1
 				this.updateSendMuteState(Constants.SendType.InputToZone, inputNum, zoneNum, muteState)
 				this.checkFeedbacks('inputToZoneMute')
 				return
 			}
+
 			return
 		}
 
@@ -524,6 +523,21 @@ class AHMInstance extends InstanceBase {
 			// first value of hex:B0 and third value of hex:C0 means preset recall data
 			return
 		}
+	}
+
+	/** Stores Input-to-Zone send levels using 1-based user channel numbers. */
+	updateSendLevelState(sendType, channelNumber, sendChannelNumber, levelRaw) {
+		if (sendType !== Constants.SendType.InputToZone) return
+
+		if (!Array.isArray(this.inputsToZonesLevel[channelNumber])) {
+			this.inputsToZonesLevel[channelNumber] = new Array(this.numberOfZones + 1).fill(undefined)
+		}
+		this.inputsToZonesLevel[channelNumber][sendChannelNumber] = levelRaw
+	}
+
+	getInputToZoneLevel(channelNumber, sendChannelNumber) {
+		const levelRaw = this.inputsToZonesLevel[channelNumber]?.[sendChannelNumber]
+		return levelRaw === undefined ? undefined : this.getDbuValue(levelRaw)
 	}
 
 	/**

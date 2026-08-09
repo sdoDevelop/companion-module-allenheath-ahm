@@ -207,6 +207,11 @@ export function getActions() {
 		]
 
 		this.sendCommand(buffers)
+
+		if (type === Constants.SendType.InputToZone) {
+			await this.sleep(150)
+			this.requestSendLevelInfo(type, chNumber, sendChNumber)
+		}
 	}
 
 	this.resolveMute = async (action, requestCurrentMute, target) => {

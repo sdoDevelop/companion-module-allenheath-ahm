@@ -19,7 +19,12 @@ export function getFeedbacks() {
 				extractedFeedbackInfo.channel = feedback.options.input
 				extractedFeedbackInfo.sendChannel = feedback.options.zone
 				break
-
+			case 'inputToZoneLevel':
+				extractedFeedbackInfo.type = Constants.MonitoredFeedbackType.Level
+				extractedFeedbackInfo.sendType = Constants.SendType.InputToZone
+				extractedFeedbackInfo.channel = feedback.options.input
+				extractedFeedbackInfo.sendChannel = feedback.options.zone
+				break
 			default:
 				extractedFeedbackInfo.type = Constants.MonitoredFeedbackType.Undefined
 		}
@@ -127,6 +132,54 @@ export function getFeedbacks() {
 				// only splice array when feedback was found
 				this.monitoredFeedbacks.splice(feedbackIndex, 1) // 2nd parameter means remove one item only
 			}
+		},
+	}
+
+	feedbacks['inputToZoneLevel'] = {
+		type: 'advanced',
+		name: 'Input to Zone - Level Display',
+		description: 'Displays the current Input-to-Zone send level in dB',
+		options: [
+			{
+				type: 'number',
+				label: 'Input',
+				id: 'input',
+				default: 1,
+				min: 1,
+				max: this.numberOfInputs,
+				asInteger: true,
+			},
+			{
+				type: 'number',
+				label: 'Zone',
+				id: 'zone',
+				default: 1,
+				min: 1,
+				max: this.numberOfZones,
+				asInteger: true,
+			},
+			{
+				type: 'textinput',
+				label: 'Text prefix (optional)',
+				id: 'prefix',
+				default: '',
+			},
+		],
+		callback: (feedback) => {
+			const inputNumber = parseInt(feedback.options.input)
+			const zoneNumber = parseInt(feedback.options.zone)
+			const level = this.getInputToZoneLevel(inputNumber, zoneNumber)
+			const prefix = feedback.options.prefix ?? ''
+			return { text: `${prefix}${level === undefined ? '--' : level} dB` }
+		},
+		subscribe: (feedback) => {
+			const monitoredFeedback = this.buildFeedbackMonitoringObject(feedback)
+			this.monitoredFeedbacks.push(monitoredFeedback)
+			this.pollMonitoredFeedback(monitoredFeedback)
+		},
+		unsubscribe: (feedback) => {
+			const feedbackIndex = this.monitoredFeedbacks.findIndex((monFeedback) => monFeedback.id == feedback.id)
+			if (feedbackIndex > -1) this.monitoredFeedbacks.splice(feedbackIndex, 1)
 		},
 	}
 

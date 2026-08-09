@@ -23,6 +23,7 @@ function createContext({ channelMute = false, sendMute = false } = {}) {
 		waitForSendMute: async () => sendMute,
 		requestSendMuteInfo: () => {},
 		updateSendMuteState: (...args) => sendState.push(args),
+		requestSendLevelInfo: () => {},
 	}
 
 	return { context, actions: getActions.bind(context)(), sent, sendState }
