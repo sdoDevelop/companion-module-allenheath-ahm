@@ -57,7 +57,7 @@ export default [
 			if (action.actionId === 'inc_dec_level_input' || action.actionId === 'inc_dec_level_zone') {
 				// check if the action has the option 'number' (by checking if property exists)
 				if (Object.hasOwn(action.options, 'number')) {
-					action.options.number = action.options.incdec_ch_number
+					action.options.incdec_ch_number = action.options.number
 					delete action.options.number
 
 					changes.updatedActions.push(action)
@@ -67,12 +67,49 @@ export default [
 			if (action.actionId === 'set_level_input' || action.actionId === 'set_level_zone') {
 				// check if the action has the option 'number' (by checking if property exists)
 				if (Object.hasOwn(action.options, 'number')) {
-					action.options.number = action.options.setlvl_ch_number
+					action.options.setlvl_ch_number = action.options.number
 					delete action.options.number
 
 					changes.updatedActions.push(action)
 				}
 			}
+		}
+
+		return changes
+	},
+	function v3_buttons_preserve_action_assignments(context, props) {
+		const changes = {
+			updatedConfig: null,
+			updatedActions: [],
+			updatedFeedbacks: [],
+		}
+
+		const actionsWithChannelAssignments = new Set([
+			'mute_input',
+			'mute_zone',
+			'input_to_zone',
+			'set_level_input',
+			'inc_dec_level_input',
+			'set_level_zone',
+			'inc_dec_level_zone',
+			'inc_dec_in_zn_send_level',
+			'inc_dec_zn_zn_send_level',
+			'set_level_controlgroup',
+			'inc_dec_level_controlgroup',
+			'mute_controlgroup',
+			'preset_recall',
+			'playback_track',
+		])
+
+		for (const action of props.actions) {
+			if (!actionsWithChannelAssignments.has(action.actionId)) continue
+
+			// Return a fresh action/options object so Buttons explicitly carries every
+			// stored number or expression into the new module version unchanged.
+			changes.updatedActions.push({
+				...action,
+				options: { ...action.options },
+			})
 		}
 
 		return changes
